@@ -17,10 +17,13 @@ func ListenRpc(r *Raft) {
 
 	rpc.HandleHTTP()
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", r.node.Port))
+	lis, err := net.Listen("tcp", r.node.Port)
 	if err != nil {
 		panic(err)
+
 	}
+
+	fmt.Println("rpc 启动成功")
 	go func() {
 		for {
 			con, err := lis.Accept()
@@ -38,12 +41,15 @@ func ListenRpc(r *Raft) {
 func (r *Raft) ForWardCall(method string, args interface{}, rely bool, fun func(bool)) {
 	for _, cf := range r.regisConfig.Globle {
 		if cf.RaftId == r.node.RaftId {
+			fmt.Println("call 自己")
 			//不需call 自己
 			continue
 		}
-		cli, err := rpc.DialHTTP("tcp", cf.Port)
+
+		cli, err := rpc.DialHTTP("tcp", "127.0.0.1"+cf.Port)
 		if err != nil {
-			log.Fatalf("链接出错")
+			//	//log.Fatalf("链接出错")
+			//	fmt.Println("链接出错")
 			fun(false)
 			continue
 		}
@@ -52,8 +58,11 @@ func (r *Raft) ForWardCall(method string, args interface{}, rely bool, fun func(
 			fun(false)
 			continue
 		}
+		cli.Close()
 		fun(true)
+
 	}
+
 }
 
 //接收心跳Rpc 函数
@@ -67,7 +76,10 @@ func (r *Raft) RecvHeart(node RaftNode, re *bool) {
 
 //向主节点投票
 func (r *Raft) AskForNodeVote(node RaftNode) {
+
+	fmt.Println("调用")
 	r.mu.Lock()
+
 	r.SetVoteFor(node.RaftId)
 	r.mu.Unlock()
 }
@@ -76,7 +88,7 @@ func (r *Raft) AskForNodeVote(node RaftNode) {
 func (r *Raft) RecvLeaderTaskOffice(node RaftNode) {
 	r.mu.Lock()
 	r.SetCurrentTerm(node.RaftId)
-
+	fmt.Printf("大哥是%d", node.RaftId)
 	r.mu.Unlock()
 
 }

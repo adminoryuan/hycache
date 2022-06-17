@@ -2,6 +2,7 @@ package raft
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 )
 
@@ -13,7 +14,8 @@ func (r *Raft) ProCandidate() bool {
 
 	if r.VotedFor == -1 && r.currentTerm == -1 {
 		//还是保持不变的话 那么你有机会成为大哥
-		r.mu.Unlock()
+		fmt.Println("我成功成为候选人了")
+		r.mu.Lock()
 
 		r.state = 1
 		r.currentTerm = -1
@@ -30,21 +32,44 @@ func getCurrSecoud() int64 {
 	return time.Now().UnixNano() / int64(time.Second)
 }
 
+func (r *Raft) Start() {
+	for r.currentTerm == -1 {
+		if r.ProCandidate() {
+			if r.Election() {
+				fmt.Println("当选")
+				//go r.DeteHeart()
+
+			}
+		}
+	}
+}
+
 //开始选举
 func (r *Raft) Election() bool {
 	okChan := make(chan struct{})
 
+	fmt.Println("开始选举")
 	go r.ForWardCall("Raft.AskForNodeVote", r.node, true, func(b bool) {
-		fmt.Println("请候选人投票完毕")
-		okChan <- struct{}{}
+		fmt.Println(b)
+		if b {
+			okChan <- struct{}{}
+		}
+
 	})
 	for {
 		select {
 		case <-time.After(time.Second * time.Duration(r.EleTimeOut)):
+
+			fmt.Println("选举超时")
+
 			return false
 
 		case <-okChan:
-			if r.Vote > len(r.regisConfig.Globle)/2 && r.currentTerm == -1 {
+			r.mu.Lock()
+			r.Vote += 1
+			r.mu.Unlock()
+			fmt.Println(r.Vote)
+			if r.Vote > (len(r.regisConfig.Globle)/2) && r.currentTerm == -1 {
 				//当选了
 
 				r.state = 2
@@ -52,12 +77,14 @@ func (r *Raft) Election() bool {
 
 				//广播给子节点 告诉他们我当选了
 				r.ForWardCall("Raft.RecvLeaderTaskOffice", r.node, true, func(b bool) {
-					fmt.Println("成功")
+					fmt.Println("通知成功")
 				})
 				go r.Heartbeat()
 				return true
 
 			}
+			fmt.Println("未当选")
+			return false
 		}
 	}
 }
@@ -65,20 +92,12 @@ func (r *Raft) Election() bool {
 //心跳检测
 func (r *Raft) DeteHeart() {
 	for {
+		time.Sleep(time.Microsecond * 4000)
 		if r.lastApplied != 0 && getCurrSecoud()-int64(r.lastApplied) > int64(r.HeartSleep) {
 			r.setDefault()
 			r.lastApplied = 0
-			func() {
-				for {
-					if r.ProCandidate() {
-						if r.Election() {
-							break
-						}
-					} else {
-						break
-					}
-				}
-			}()
+			fmt.Println("未收到心跳")
+			go r.Start()
 		}
 
 	}
@@ -92,7 +111,7 @@ func (r *Raft) Heartbeat() {
 			return
 		default:
 			r.ForWardCall("Raft.RecvHeart", r.node, false, func(b bool) {
-				fmt.Println("客户端收到心跳")
+				//	fmt.Println("客户端收到心跳")
 			})
 			time.Sleep(time.Duration(r.HeartSleep))
 
@@ -103,5 +122,5 @@ func (r *Raft) Heartbeat() {
 
 //生产一个随机时候
 func getRandomTime() time.Duration {
-	return 1234
+	return time.Duration(3000 + rand.Intn(10000)*int(time.Microsecond))
 }
