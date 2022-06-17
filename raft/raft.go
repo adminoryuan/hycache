@@ -5,19 +5,23 @@ import "sync"
 type Raft struct {
 	mu sync.Mutex
 
-	me int //idx
+	HeartSleep int //间隔
+
+	EleTimeOut int
 
 	currentTerm int //当前Term
 
 	VotedFor int //我投票给了谁
 
-	Vote int //票数
+	Vote int //累计票数
 
 	state int //标识了我leard 、follower
 
 	Log []LogEntry
 
 	node RaftNode
+
+	IsSendHeart chan struct{}
 
 	CommitIndex int //目前确定已经提交的idx
 
@@ -26,12 +30,14 @@ type Raft struct {
 	nextIndex map[int]int
 
 	matchIndex map[int]int
+
+	regisConfig Config
 }
 
 type RaftNode struct {
 	RaftId int
 
-	Port int
+	Port string
 }
 
 func NewRaft(node RaftNode) *Raft {
@@ -49,6 +55,15 @@ func NewRaft(node RaftNode) *Raft {
 	return r
 
 }
+func (rr *Raft) setDefault() {
+	rr.mu.Lock()
+	rr.state = -1
+
+	rr.SetVoteFor(-1)
+
+	rr.SetCurrentTerm(-1)
+	rr.mu.Unlock()
+}
 
 //投票
 func (r *Raft) AddVoted() {
@@ -58,12 +73,13 @@ func (r *Raft) AddVoted() {
 	r.mu.Unlock()
 }
 
-func (r *Raft) setVoteFor(id int) {
+func (r *Raft) SetVoteFor(id int) {
 	r.mu.Lock()
 	r.VotedFor = id
 	r.mu.Unlock()
 }
-func (r *Raft) setCurrentTerm(term int) {
+
+func (r *Raft) SetCurrentTerm(term int) {
 	r.mu.Lock()
 	r.currentTerm = term
 	r.mu.Unlock()
