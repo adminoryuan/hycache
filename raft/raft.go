@@ -71,10 +71,8 @@ func (rr *Raft) setDefault() {
 
 	rr.state = 0
 
-	
 	rr.SetVoteFor(-1)
 
-	
 }
 
 //投票
