@@ -34,14 +34,18 @@ func getCurrSecoud() int64 {
 
 func (r *Raft) Start() {
 	for r.currentTerm == -1 {
+		fmt.Println("开始")
 		if r.ProCandidate() {
 			if r.Election() {
 				fmt.Println("当选")
 				//go r.DeteHeart()
-
+				break
 			}
 		}
+		fmt.Println("恢复默认设置")
+		r.setDefault()
 	}
+	fmt.Println("结束")
 }
 
 //开始选举
@@ -49,8 +53,8 @@ func (r *Raft) Election() bool {
 	okChan := make(chan struct{})
 
 	fmt.Println("开始选举")
-	go r.ForWardCall("Raft.AskForNodeVote", r.node, true, func(b bool) {
-		fmt.Println(b)
+	go r.ForWardCall("Raft.AskForNodeVote", r.node, func(b bool) {
+
 		if b {
 			okChan <- struct{}{}
 		}
@@ -58,16 +62,16 @@ func (r *Raft) Election() bool {
 	})
 	for {
 		select {
-		case <-time.After(time.Second * time.Duration(r.EleTimeOut)):
+		case <-time.After(time.Second * time.Duration(r.EleTimeOut+10)):
 
 			fmt.Println("选举超时")
 
 			return false
 
 		case <-okChan:
-			r.mu.Lock()
-			r.Vote += 1
-			r.mu.Unlock()
+
+			fmt.Println("选票+1")
+			r.AddVoted()
 			fmt.Println(r.Vote)
 			if r.Vote > (len(r.regisConfig.Globle)/2) && r.currentTerm == -1 {
 				//当选了
@@ -76,13 +80,18 @@ func (r *Raft) Election() bool {
 				r.SetCurrentTerm(r.node.RaftId)
 
 				//广播给子节点 告诉他们我当选了
-				r.ForWardCall("Raft.RecvLeaderTaskOffice", r.node, true, func(b bool) {
-					fmt.Println("通知成功")
+				r.ForWardCall("Raft.RecvLeaderTaskOffice", r.node, func(b bool) {
+					if b {
+						fmt.Println("通知成功")
+					}
+
 				})
 				go r.Heartbeat()
 				return true
 
 			}
+			r.mu.Unlock()
+
 			fmt.Println("未当选")
 			return false
 		}
@@ -110,10 +119,11 @@ func (r *Raft) Heartbeat() {
 		case <-r.IsSendHeart:
 			return
 		default:
-			r.ForWardCall("Raft.RecvHeart", r.node, false, func(b bool) {
+			r.ForWardCall("Raft.RecvHeart", r.node, func(b bool) {
 				//	fmt.Println("客户端收到心跳")
 			})
-			time.Sleep(time.Duration(r.HeartSleep))
+			fmt.Println("发送心跳")
+			time.Sleep(time.Duration(r.HeartSleep * int(time.Second)))
 
 		}
 

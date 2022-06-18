@@ -1,6 +1,8 @@
 package raft
 
-import "sync"
+import (
+	"sync"
+)
 
 type Raft struct {
 	mu sync.Mutex
@@ -25,7 +27,7 @@ type Raft struct {
 
 	CommitIndex int //目前确定已经提交的idx
 
-	lastApplied int
+	lastApplied int64
 
 	nextIndex map[int]int
 
@@ -49,6 +51,7 @@ func NewRaft(node RaftNode) *Raft {
 	r.VotedFor = -1
 
 	r.state = -1
+	r.Vote = 0
 
 	r.mu = sync.Mutex{}
 
@@ -69,7 +72,7 @@ func (rr *Raft) setDefault() {
 	rr.state = -1
 
 	rr.SetVoteFor(-1)
-
+	
 	rr.SetCurrentTerm(-1)
 	rr.mu.Unlock()
 }
@@ -84,7 +87,9 @@ func (r *Raft) AddVoted() {
 
 func (r *Raft) SetVoteFor(id int) {
 	r.mu.Lock()
+
 	r.VotedFor = id
+
 	r.mu.Unlock()
 }
 

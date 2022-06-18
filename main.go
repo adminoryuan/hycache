@@ -19,10 +19,10 @@ func main() {
 	raftobj := raft.NewRaft(raft.RaftNode{RaftId: *id, Port: *port})
 	//raftobj.AddConfig(raft.RaftNode{RaftId: *id, Port: *port})
 
-	raft.ListenRpc(raftobj)
+	go raft.ListenRpc(raftobj)
 
 	go raftobj.DeteHeart()
-	
+
 	raftobj.Start()
 
 	w.Wait()
