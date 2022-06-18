@@ -68,13 +68,13 @@ func (c *Raft) AddConfig(nodes RaftNode) {
 	c.regisConfig.Globle = append(c.regisConfig.Globle, nodes)
 }
 func (rr *Raft) setDefault() {
-	rr.mu.Lock()
-	rr.state = -1
 
-	rr.SetVoteFor(-1)
+	rr.state = 0
+
 	
-	rr.SetCurrentTerm(-1)
-	rr.mu.Unlock()
+	rr.SetVoteFor(-1)
+
+	
 }
 
 //投票
