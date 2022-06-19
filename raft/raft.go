@@ -31,9 +31,9 @@ type Raft struct {
 
 	lastApplied int64
 
-	nextIndex map[int]int
+	nextIndex map[int]int //每个节点下一个发送的日志index
 
-	matchIndex map[int]int
+	matchIndex map[int]int //节点已经提交日志的index
 
 	regisConfig Config
 }
@@ -59,6 +59,8 @@ type ReqVote struct {
 type ReqVoteRes struct {
 	Term int
 
+	Currid int
+
 	VoteGranted bool
 }
 
@@ -71,7 +73,8 @@ func NewRaft(node RaftNode) *Raft {
 	r.VotedFor = -1
 
 	r.state = -1
-	
+
+	r.nextIndex = make(map[int]int, 0)
 	r.Vote = 0
 
 	r.mu = sync.Mutex{}

@@ -3,6 +3,7 @@ package raft
 import (
 	"fmt"
 	"math/rand"
+	"net/rpc"
 	"time"
 )
 
@@ -165,5 +166,37 @@ func (r *Raft) Heartbeat() {
 func getRandomTime() time.Duration {
 	rand.Seed(time.Now().UnixNano())
 	return time.Millisecond*time.Duration(rand.Intn(3000)) + 1500
+
+}
+
+//向所有节点追加日志
+func (r *Raft) AppenEntry(log LogEntry, rely *ReqVoteRes) error {
+	for _, node := range r.regisConfig.Globle {
+		go r.CallRecvLogger(node)
+	}
+	return nil
+}
+func (r *Raft) CallRecvLogger(cf RaftNode) bool {
+
+	cli, err := rpc.DialHTTP("tcp", "127.0.0.1"+cf.Port)
+	if err != nil {
+		return false
+	}
+	for {
+		var re ReqVoteRes
+		log := r.Log[r.nextIndex[cf.RaftId]]
+
+		err := cli.Call("Raft.RecvLogger", log, &re)
+		if err != nil {
+			continue
+		}
+		if re.VoteGranted {
+			r.nextIndex[cf.RaftId] -= 1
+			continue
+		} else {
+			r.matchIndex[cf.RaftId] = r.nextIndex[cf.RaftId]
+		}
+
+	}
 
 }

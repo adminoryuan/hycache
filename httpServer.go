@@ -30,7 +30,7 @@ func ListenServer() {
 		key := r.PostForm.Get("key")
 
 		Caobj.mu.Lock()
-		Caobj.Put(key, r.PostForm.Get("data"), float64(timOut))
+		Caobj.Put(key, r.PostForm.Get("data"), int64(timOut))
 		Caobj.mu.Unlock()
 	})
 

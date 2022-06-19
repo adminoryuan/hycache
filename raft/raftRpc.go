@@ -118,3 +118,6 @@ func (r *Raft) RecvLeaderTaskOffice(node RaftNode, rely *bool) error {
 	*rely = true
 	return nil
 }
+func (r *Raft) RecvLogger(lrty LogEntry, res ReqVoteRes, rely *bool) {
+
+}
