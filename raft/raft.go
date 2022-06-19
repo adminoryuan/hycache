@@ -11,7 +11,9 @@ type Raft struct {
 
 	EleTimeOut int
 
-	currentTerm int //当前Term
+	leaderId int //当前领导人id
+
+	term int // 任期号
 
 	VotedFor int //我投票给了谁
 
@@ -40,17 +42,36 @@ type RaftNode struct {
 	RaftId int
 
 	Port string
+
+	term int
+}
+
+type ReqVote struct {
+	Term int
+
+	CandidateId int
+
+	LastLogIndex int
+
+	LastLogTerm int
+}
+
+type ReqVoteRes struct {
+	Term int
+
+	VoteGranted bool
 }
 
 func NewRaft(node RaftNode) *Raft {
 	r := new(Raft)
 
 	r.node = node
-	r.currentTerm = -1
+	r.leaderId = -1
 
 	r.VotedFor = -1
 
 	r.state = -1
+	
 	r.Vote = 0
 
 	r.mu = sync.Mutex{}
@@ -91,9 +112,17 @@ func (r *Raft) SetVoteFor(id int) {
 	r.mu.Unlock()
 }
 
-func (r *Raft) SetCurrentTerm(term int) {
+func (r *Raft) SetTerm(trem int) {
 	r.mu.Lock()
-	r.currentTerm = term
+
+	r.term = trem
+
+	r.mu.Unlock()
+
+}
+func (r *Raft) SetCurrentLeader(term int) {
+	r.mu.Lock()
+	r.leaderId = term
 	r.mu.Unlock()
 }
 

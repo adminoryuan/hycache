@@ -1,6 +1,8 @@
 package main
 
-import "sync"
+import (
+	"sync"
+)
 
 type cache struct {
 	mu    sync.Locker
@@ -17,6 +19,11 @@ type cacheEntity struct {
 	timeout float64
 
 	val interface{}
+}
+
+//处理过期的key
+func (c *cache) handleOverkey() {
+
 }
 
 func (c *cache) Put(key string, val interface{}, time float64) {

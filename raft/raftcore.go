@@ -10,19 +10,20 @@ import (
 //此时每个参与者都有机会
 // 那么这个幸运儿是谁了?
 func (r *Raft) ProCandidate() bool {
+
 	time.Sleep(getRandomTime())
-
-	time.Sleep(time.Second * time.Duration(rand.Intn(10)))
-
+	time.Sleep(getRandomTime())
 	r.mu.Lock()
-	if r.VotedFor == -1 && r.currentTerm == -1 {
+	if r.VotedFor == -1 && r.leaderId == -1 {
 		//还是保持不变的话 那么你有机会成为大哥
+
 		fmt.Println("我成功成为候选人了")
 		r.mu.Unlock()
 		r.state = 1
-
+		r.SetTerm(r.term + 1)
 		r.SetVoteFor(r.node.RaftId)
 		r.AddVoted()
+		//r.SetCurrentLeader(r.node.RaftId)
 
 		return true
 
@@ -40,7 +41,6 @@ func (r *Raft) Start() {
 		if r.ProCandidate() {
 			if r.Election() {
 				fmt.Println("当选")
-
 				break
 			} else {
 				continue
@@ -56,10 +56,15 @@ func (r *Raft) Start() {
 func (r *Raft) Election() bool {
 	okChan := make(chan struct{})
 
-	fmt.Println("开始选举")
-	go r.ForWardCall("Raft.AskForNodeVote", r.node, func(b bool) {
+	reqVoteobj := ReqVote{Term: r.term, CandidateId: r.leaderId, LastLogIndex: 0, LastLogTerm: 0}
+	//var rs ReqVoteRes
+	go r.ForWardCall("Raft.AskForNodeVote", reqVoteobj, new(ReqVoteRes), func(b interface{}) {
+		if b == nil {
+			return
+		}
+		result := b.(*ReqVoteRes)
 
-		if b {
+		if result.VoteGranted {
 			okChan <- struct{}{}
 		}
 
@@ -77,15 +82,19 @@ func (r *Raft) Election() bool {
 			fmt.Println("选票+1")
 			r.AddVoted()
 			fmt.Println(r.Vote)
-			if r.Vote > (3/2) && r.currentTerm == -1 {
+			if r.Vote > (3/2) && r.leaderId == -1 {
 				//当选了
 
 				r.state = 2
-				r.SetCurrentTerm(r.node.RaftId)
+				r.SetCurrentLeader(r.node.RaftId)
 
 				//广播给子节点 告诉他们我当选了
-				r.ForWardCall("Raft.RecvLeaderTaskOffice", r.node, func(b bool) {
-					if b {
+				//	var re bool
+				r.ForWardCall("Raft.RecvLeaderTaskOffice", r.node, new(bool), func(b interface{}) {
+					if b == nil {
+						return
+					}
+					if *b.(*bool) {
 						fmt.Println("通知成功")
 					} else {
 						fmt.Println("通知失败")
@@ -115,7 +124,7 @@ func (r *Raft) DeteHeart() {
 
 			r.mu.Lock()
 
-			r.currentTerm = -1
+			r.leaderId = -1
 
 			r.VotedFor = -1
 
@@ -141,7 +150,7 @@ func (r *Raft) Heartbeat() {
 		case <-r.IsSendHeart:
 			return
 		default:
-			r.ForWardCall("Raft.RecvHeart", r.node, func(b bool) {
+			r.ForWardCall("Raft.RecvHeart", r.node, new(ReqVoteRes), func(b interface{}) {
 				//	fmt.Println("客户端收到心跳")
 			})
 			fmt.Println("发送心跳")

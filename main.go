@@ -6,6 +6,10 @@ import (
 	"sync"
 )
 
+type Pro struct {
+	id int
+}
+
 func main() {
 	port := flag.String("port", "9000", "输入监听的端口")
 	id := flag.Int("id", -1, "输入监听的端口")

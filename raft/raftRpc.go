@@ -26,7 +26,7 @@ func ListenRpc(Raft *Raft) {
 }
 
 //转发rpc 调用
-func (r *Raft) ForWardCall(method string, args interface{}, fun func(bool)) {
+func (r *Raft) ForWardCall(method string, args interface{}, res interface{}, fun func(interface{})) {
 	for _, cf := range r.regisConfig.Globle {
 		if cf.RaftId == r.node.RaftId {
 
@@ -36,50 +36,74 @@ func (r *Raft) ForWardCall(method string, args interface{}, fun func(bool)) {
 		cli, err := rpc.DialHTTP("tcp", "127.0.0.1"+cf.Port)
 		if err != nil {
 			//	//log.Fatalf("链接出错")
-			//	fmt.Println("链接出错")
-			fun(false)
+
+			fun(nil)
 			continue
 		}
 
-		var rely bool
-		err = cli.Call(method, args, &rely)
-
+		err = cli.Call(method, args, res)
 		if err != nil {
-			fun(false)
+			fmt.Println(err.Error())
+			fmt.Println("call 失败")
+			fun(nil)
 			continue
 		}
+
 		cli.Close()
-		fun(rely)
+
+		fun(res)
 
 	}
 
 }
 
 //接收心跳Rpc 函数
-func (r *Raft) RecvHeart(node RaftNode, re *bool) error {
-	if r.currentTerm == -1 {
-		r.SetCurrentTerm(node.RaftId)
+func (r *Raft) RecvHeart(node RaftNode, re *ReqVoteRes) error {
+	re.Term = node.term
+	if r.term < node.term {
+		re.VoteGranted = false
+	} else if r.leaderId == -1 {
+		r.SetCurrentLeader(node.RaftId)
+	} else {
+		r.lastApplied = getCurrSecoud()
+
+		re.VoteGranted = true
 	}
-	r.lastApplied = getCurrSecoud()
-	*re = true
 	fmt.Println("收到心跳")
 	return nil
 }
 
 //向主节点投票
-func (r *Raft) AskForNodeVote(node RaftNode, rely *bool) error {
+func (r *Raft) AskForNodeVote(node ReqVote, vote *ReqVoteRes) error {
 
-	//fmt.Println("调用")
-	//r.mu.Lock()
-	if r.currentTerm != -1 || r.VotedFor != -1 {
-		*rely = false
+	if node.Term < r.term {
+		*vote = ReqVoteRes{
+			VoteGranted: false,
+			Term:        r.term,
+		}
+
+		return nil
+	}
+
+	fmt.Printf("%d -% d", r.leaderId, r.VotedFor)
+	if r.leaderId != -1 || r.VotedFor != -1 {
+		//vote.voteGranted = false
+		//vote.term = r.term
+		*vote = ReqVoteRes{
+			VoteGranted: false,
+			Term:        r.term,
+		}
+
 		fmt.Println("投票失败")
 		return nil
 	}
 
-	r.SetVoteFor(node.RaftId)
-	*rely = true
-	//r.mu.Unlock()
+	r.SetVoteFor(node.CandidateId)
+	*vote = ReqVoteRes{
+		VoteGranted: true,
+		Term:        r.term,
+	}
+
 	return nil
 }
 
@@ -88,7 +112,7 @@ func (r *Raft) RecvLeaderTaskOffice(node RaftNode, rely *bool) error {
 
 	fmt.Printf("大哥是%d \n", node.RaftId)
 
-	r.SetCurrentTerm(node.RaftId)
+	r.SetCurrentLeader(node.RaftId)
 
 	r.setDefault()
 	*rely = true
